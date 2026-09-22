@@ -53,14 +53,21 @@ def tokenize(text: str, lang: str = "de") -> set[str]:
 
 
 def search_scored(
-    db: Session, query: str, limit: int = 3, lang: str = "de"
+    db: Session, query: str, limit: int = 3, lang: str = "de",
+    topics: list[str] | None = None,
 ) -> list[tuple[GuidelineChunk, int]]:
-    """Same as search, but with scores attached (for logging/eval)."""
+    """Same as search, but with scores attached (for logging/eval).
+
+    `topics` (from the JEV router) restricts the pool to matching rows;
+    None searches everything.
+    """
     q = tokenize(query, lang)
     if not q:
         return []
     scored = []
     rows = db.query(GuidelineChunk).filter_by(status="live", lang=lang).all()
+    if topics:
+        rows = [c for c in rows if set(topics) & set(c.topics or [])]
     for chunk in rows:
         title_hits = len(q & tokenize(chunk.title or "", lang))
         text_hits = len(q & tokenize(chunk.text or "", lang))

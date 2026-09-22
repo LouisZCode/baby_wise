@@ -8,6 +8,7 @@ from .composer import compose, compose_turn
 from .db import get_db
 from .models import EVENT_TYPES, MESSAGE_ROLES, Chat, Child, Event, Message
 from .retrieval import MIN_SCORE, search_scored
+from .router import TOPIC_MIN_CONF, route_question
 from .schemas import (
     AskIn, AskOut, ChildIn, ChildOut, ConversationOut, EventIn, EventOut,
     MessageOut, TurnIn, TurnOut,
@@ -66,18 +67,21 @@ def timeline(child_id: str, db: Session = Depends(get_db)) -> list[Event]:
 
 @app.post("/ask", response_model=AskOut)
 def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
-    # Explicit states instead of weak-soup answers:
+    # JEV routes first (topic filter + urgency flag, graceful None), then:
     # - no_match: nothing scored >= MIN_SCORE → localized message, no claims.
     # - llm_unavailable: compose requested but the model failed → localized
     #   message, claims kept in the payload (UI hides them in compose mode).
     import time
 
     t0 = time.perf_counter()
+    route = route_question(body.question)
+    topics = _route_topics(route)
     scored = [
-        (c, s) for c, s in search_scored(db, body.question, lang=body.lang)
+        (c, s)
+        for c, s in search_scored(db, body.question, lang=body.lang, topics=topics)
         if s >= MIN_SCORE
     ]
-    out = AskOut(claims=[c for c, _ in scored])
+    out = AskOut(claims=[c for c, _ in scored], route=_public_route(route))
     if not scored:
         out.error = {"code": "no_match", "message": _message("no_match", body.lang)}
     elif body.compose:
@@ -97,6 +101,22 @@ def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
         latency_ms=int((time.perf_counter() - t0) * 1000),
     )
     return out
+
+
+def _route_topics(route: dict | None) -> list[str] | None:
+    if (
+        route is None
+        or route["topic"] == "other"
+        or route["topic_confidence"] < TOPIC_MIN_CONF
+    ):
+        return None
+    return [route["topic"]]
+
+
+def _public_route(route: dict | None) -> dict | None:
+    if route is None:
+        return None
+    return {"topic": route["topic"], "urgent": route["urgent"] >= 0.7}
 
 
 _MESSAGES = {
@@ -153,8 +173,11 @@ def post_turn(chat_id: str, body: TurnIn, db: Session = Depends(get_db)) -> Turn
     db.commit()
     db.refresh(user_msg)
 
+    route = route_question(body.question)
+    topics = _route_topics(route)
     scored = [
-        (c, s) for c, s in search_scored(db, body.question, lang=body.lang)
+        (c, s)
+        for c, s in search_scored(db, body.question, lang=body.lang, topics=topics)
         if s >= MIN_SCORE
     ]
     claims = [c for c, _ in scored]
@@ -196,4 +219,5 @@ def post_turn(chat_id: str, body: TurnIn, db: Session = Depends(get_db)) -> Turn
         answer=content,
         latency_ms=int((time.perf_counter() - t0) * 1000),
     )
-    return TurnOut(user_message=user_msg, assistant_message=asst_msg, error=error)
+    return TurnOut(user_message=user_msg, assistant_message=asst_msg,
+                   error=error, route=_public_route(route))

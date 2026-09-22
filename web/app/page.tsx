@@ -8,6 +8,7 @@ type Msg = {
   content: string;
   lang: string;
   sources: string[];
+  route?: { topic: string; urgent: boolean } | null;
 };
 
 export default function Home() {
@@ -43,7 +44,11 @@ export default function Home() {
       });
       if (!r.ok) throw new Error(`Backend: ${r.status}`);
       const turn = await r.json();
-      setMsgs((m) => [...m, turn.user_message, turn.assistant_message]);
+      const asst = {
+        ...turn.assistant_message,
+        route: turn.route ?? null,
+      };
+      setMsgs((m) => [...m, turn.user_message, asst]);
       setQuestion("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
@@ -87,6 +92,13 @@ export default function Home() {
             }`}
           >
             {m.content}
+            {m.role === "assistant" && m.route?.urgent && (
+              <p className="mt-2 rounded-xl bg-red-50 p-2 text-sm text-red-700">
+                {m.lang === "de"
+                  ? "Das klingt möglicherweise dringend — bei Unsicherheit wende dich an deine Kinderarztpraxis oder den ärztlichen Bereitschaftsdienst (116 117)."
+                  : "This sounds potentially urgent — if unsure, contact your pediatrician or local emergency care."}
+              </p>
+            )}
             {m.role === "assistant" && m.sources.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {m.sources.map((s) => (

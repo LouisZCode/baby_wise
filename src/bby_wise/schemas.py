@@ -60,6 +60,7 @@ class AskOut(BaseModel):
     conflicts: list[dict] = Field(default_factory=list)
     answer: str | None = None
     error: dict | None = None
+    route: dict | None = None
 
 
 class ConversationOut(BaseModel):
@@ -87,3 +88,4 @@ class TurnOut(BaseModel):
     user_message: MessageOut
     assistant_message: MessageOut
     error: dict | None = None
+    route: dict | None = None
