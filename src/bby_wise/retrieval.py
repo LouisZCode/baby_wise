@@ -36,14 +36,10 @@ def tokenize(text: str) -> set[str]:
     }
 
 
-def search(
+def search_scored(
     db: Session, query: str, limit: int = 3, lang: str = "de"
-) -> list[GuidelineChunk]:
-    """Return up to `limit` live chunks in `lang`, ranked by token overlap.
-
-    Title matches weigh 3x — FAQ titles are the question, so they carry
-    the intent.
-    """
+) -> list[tuple[GuidelineChunk, int]]:
+    """Same as search, but with scores attached (for logging/eval)."""
     q = tokenize(query)
     if not q:
         return []
@@ -56,4 +52,15 @@ def search(
         if score > 0:
             scored.append((score, chunk.source_url, chunk))
     scored.sort(key=lambda s: (-s[0], s[1]))
-    return [c for _, _, c in scored[:limit]]
+    return [(c, s) for s, _, c in scored[:limit]]
+
+
+def search(
+    db: Session, query: str, limit: int = 3, lang: str = "de"
+) -> list[GuidelineChunk]:
+    """Return up to `limit` live chunks in `lang`, ranked by token overlap.
+
+    Title matches weigh 3x — FAQ titles are the question, so they carry
+    the intent.
+    """
+    return [c for c, _ in search_scored(db, query, limit, lang)]

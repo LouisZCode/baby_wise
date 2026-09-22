@@ -3,10 +3,11 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
+from .ask_log import log_ask
 from .composer import compose
 from .db import get_db
 from .models import EVENT_TYPES, Child, Event
-from .retrieval import search
+from .retrieval import search_scored
 from .schemas import AskIn, AskOut, ChildIn, ChildOut, EventIn, EventOut
 from .settings import settings
 
@@ -66,8 +67,20 @@ def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
     # source labels, no LLM. conflicts[] stays empty until a second
     # source exists. compose=True layers the v1 LLM paraphrase on top;
     # the claims stand alone if the LLM is unreachable.
-    claims = search(db, body.question, lang=body.lang)
-    out = AskOut(claims=claims)
+    import time
+
+    t0 = time.perf_counter()
+    scored = search_scored(db, body.question, lang=body.lang)
+    out = AskOut(claims=[c for c, _ in scored])
     if body.compose:
         out.answer = compose(body.question, out.claims, lang=body.lang)
+    log_ask(
+        question=body.question,
+        lang=body.lang,
+        compose=body.compose,
+        model=settings.llm_model if body.compose else None,
+        claims=[(c.source_url, c.lang, s) for c, s in scored],
+        answer=out.answer,
+        latency_ms=int((time.perf_counter() - t0) * 1000),
+    )
     return out
