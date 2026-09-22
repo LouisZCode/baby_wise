@@ -48,6 +48,11 @@ htmlcov/
 *.db
 *.db-journal
 
+# Next.js
+web/node_modules/
+web/.next/
+web/out/
+
 # Personal planning notes (local only, never commit)
 AGENTS.md
 architecture.md
