@@ -14,6 +14,7 @@ from .fetch import PoliteFetcher
 from .load import upsert_chunk
 from .screen import screen
 from .sitemap import parse_sitemap, sitemap_kind
+from .topics import infer_topics
 
 SITEMAP = "https://www.kindergesundheit-info.de/sitemap.xml"
 BASE = "https://www.kindergesundheit-info.de"
@@ -72,16 +73,21 @@ def collect_faq_urls(fetcher: PoliteFetcher) -> list[str]:
 def crawl_faq(
     db: Session, fetcher: PoliteFetcher, limit: int | None = None
 ) -> dict[str, int]:
-    stats = {"inserted": 0, "unchanged": 0, "superseded": 0, "quarantined": 0}
+    stats = {
+        "inserted": 0, "unchanged": 0, "superseded": 0,
+        "quarantined": 0, "empty": 0, "failed": 0,
+    }
     urls = collect_faq_urls(fetcher)
     if limit is not None:
         urls = urls[:limit]
     for url in urls:
         r = fetcher.get(url)
         if r.status_code != 200:
+            stats["failed"] += 1
             continue
         doc = extract_main(r.text)
         if not doc["text"]:
+            stats["empty"] += 1
             continue
         for part in chunk_faq(doc["title"], doc["text"]):
             flags = screen(part["text"])
@@ -93,6 +99,7 @@ def crawl_faq(
                 text=part["text"],
                 lang="de",
                 precedence_key=precedence_key(part["heading"]),
+                topics=infer_topics(url, doc["title"]),
                 quarantined=bool(flags),
             )
             stats[action] += 1

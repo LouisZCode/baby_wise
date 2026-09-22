@@ -44,6 +44,10 @@ htmlcov/
 .env
 *.env.local
 
+# Local databases (crawl previews, scratch work)
+*.db
+*.db-journal
+
 # Personal planning notes (local only, never commit)
 AGENTS.md
 architecture.md

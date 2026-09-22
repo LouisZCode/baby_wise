@@ -39,6 +39,12 @@ def upsert_chunk(
         .one_or_none()
     )
     if existing is not None and existing.content_hash == h:
+        # Same text, but derived metadata may have improved — refresh it.
+        existing.topics = topics or []
+        if precedence_key is not None:
+            existing.precedence_key = precedence_key
+        db.commit()
+        db.refresh(existing)
         return ("unchanged", existing)
     if existing is not None:
         existing.status = "superseded"
