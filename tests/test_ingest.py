@@ -6,7 +6,7 @@ from sqlalchemy.pool import StaticPool
 
 from bby_wise.ingest.aap import topic_for
 from bby_wise.ingest.chunk import chunk_by_h2, chunk_faq, precedence_key
-from bby_wise.ingest.extract import extract_main, strip_consent
+from bby_wise.ingest.extract import extract_main, strip_boilerplate, strip_consent
 from bby_wise.ingest.load import upsert_chunk, upsert_linkout
 from bby_wise.ingest.screen import screen
 from bby_wise.ingest.topics import infer_topics
@@ -118,6 +118,13 @@ def test_strip_consent_wall_after_answer():
         "Weitere Informationen finden sich in der Datenschutzerklärung."
     )
     assert strip_consent(text) == "Babys schlafen anfangs 16 Stunden am Tag."
+
+
+def test_strip_boilerplate_drops_breadcrumb():
+    text = "Wie lange schlafen Babys?\nHäufige Fragen\nBabys brauchen viel Schlaf."
+    assert strip_boilerplate(text) == (
+        "Wie lange schlafen Babys?\nBabys brauchen viel Schlaf."
+    )
 
 
 def test_screen_flags_directives():

@@ -35,6 +35,17 @@ _WALL_MARKERS = _CONSENT_MARKERS + (
 # Stable footer closing the wall on BIÖG pages.
 _WALL_FOOTER = ("datenschutzerklärung", "weitere informationen zur verarbeitung")
 
+# Exact-match boilerplate paragraphs (breadcrumbs, section labels) that
+# carry no content.
+_BOILERPLATE = frozenset({"häufige fragen"})
+
+
+def strip_boilerplate(text: str) -> str:
+    """Drop exact-match boilerplate paragraphs."""
+    return "\n".join(
+        p for p in text.split("\n") if p.strip().lower() not in _BOILERPLATE
+    )
+
 # Strict set: only ever boilerplate. The wall is dropped as the span from
 # the first to the last strict hit, so these must not occur in real content.
 _STRICT = _CONSENT_MARKERS + _WALL_FOOTER
@@ -73,4 +84,5 @@ def extract_main(html: str) -> dict[str, str | None]:
         if title is None and soup.title and soup.title.string:
             title = soup.title.string.strip()
     text = strip_consent(text or "")
+    text = strip_boilerplate(text)
     return {"title": title, "text": text}

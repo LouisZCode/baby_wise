@@ -35,3 +35,22 @@ class EventOut(BaseModel):
     note: str | None
 
     model_config = {"from_attributes": True}
+
+
+class AskIn(BaseModel):
+    question: str = Field(min_length=3, max_length=500)
+
+
+class ClaimOut(BaseModel):
+    text: str
+    source: str
+    source_url: str
+    title: str | None
+    topics: list[str]
+
+    model_config = {"from_attributes": True}
+
+
+class AskOut(BaseModel):
+    claims: list[ClaimOut]
+    conflicts: list[dict] = Field(default_factory=list)

@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from bby_wise.api import app, get_db
+from bby_wise.ingest.load import upsert_chunk
 from bby_wise.models import Base
 
 engine = create_engine(
@@ -86,3 +87,40 @@ def test_bad_event_type_rejected():
 def test_timeline_unknown_child_404():
     r = client.get("/timeline", params={"child_id": "nope"})
     assert r.status_code == 404
+
+
+def _seed_chunks():
+    db = TestingSession()
+    upsert_chunk(
+        db, source="biog", url="https://x.de/schlaf", title="Wie viel schlafen Babys?",
+        text="Babys schlafen in den ersten Wochen 16 bis 18 Stunden. " * 5,
+        lang="de", topics=["schlaf"],
+    )
+    upsert_chunk(
+        db, source="biog", url="https://x.de/brei", title="Wann startet Beikost?",
+        text="Beikost startet zwischen dem fünften und siebten Monat mit Brei. " * 5,
+        lang="de", topics=["ernaehrung"],
+    )
+    db.close()
+
+
+def test_ask_returns_ranked_verbatim_claims():
+    _seed_chunks()
+    r = client.post("/ask", json={"question": "Wie lange schlafen Babys nachts?"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["conflicts"] == []
+    assert body["claims"][0]["source_url"] == "https://x.de/schlaf"
+    assert body["claims"][0]["source"] == "biog"
+    assert "Babys schlafen" in body["claims"][0]["text"]
+
+
+def test_ask_no_match_returns_empty_claims():
+    r = client.post("/ask", json={"question": "Xylophon Reparaturanleitung"})
+    assert r.status_code == 200
+    assert r.json()["claims"] == []
+
+
+def test_ask_rejects_short_question():
+    r = client.post("/ask", json={"question": "hi"})
+    assert r.status_code == 422

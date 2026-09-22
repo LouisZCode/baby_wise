@@ -21,6 +21,14 @@ BASE = "https://www.kindergesundheit-info.de"
 FAQ_INDEX = BASE + "/themen/faq/"
 _FAQ_SLUG = re.compile(r"/themen/faq/[a-z0-9äöü-]+/$")
 
+# FAQ entries with no answer at the source (their own JSON-LD answer is
+# ""). Acknowledged, not missing: excluded from storage and eval coverage.
+KNOWN_EMPTY_FAQS = (
+    BASE + "/themen/faq/worauf-muss-ich-achten-wenn-mein-kind-erbricht/",
+    BASE + "/themen/faq/ab-wann-spricht-man-bei-kindern-von-fieber/",
+    BASE + "/themen/faq/was-kann-ich-tun-wenn-sich-meine-vierjaehrige-tochter-staendig-langweilt/",
+)
+
 
 def collect_urls(fetcher: PoliteFetcher) -> list[str]:
     urls: list[str] = []

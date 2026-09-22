@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from .db import get_db
 from .models import EVENT_TYPES, Child, Event
-from .schemas import ChildIn, ChildOut, EventIn, EventOut
+from .retrieval import search
+from .schemas import AskIn, AskOut, ChildIn, ChildOut, EventIn, EventOut
 from .settings import settings
 
 app = FastAPI(title=settings.app_name)
@@ -56,3 +57,10 @@ def timeline(child_id: str, db: Session = Depends(get_db)) -> list[Event]:
         .order_by(Event.occurred_at)
         .all()
     )
+
+
+@app.post("/ask", response_model=AskOut)
+def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
+    # v0 extractive: verbatim top chunks with source labels, no LLM.
+    # conflicts[] stays empty until a second source exists.
+    return AskOut(claims=search(db, body.question))
