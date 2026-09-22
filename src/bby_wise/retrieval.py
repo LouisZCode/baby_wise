@@ -43,6 +43,30 @@ def _stem_en(token: str) -> str:
     return token
 
 
+def _ed1(a: str, b: str) -> bool:
+    """True if edit distance between a and b is exactly 1 (typo tolerance)."""
+    if a == b:
+        return True
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1 or min(la, lb) < 4:
+        return False
+    if la == lb:
+        return sum(1 for x, y in zip(a, b) if x != y) == 1
+    short, long_ = (a, b) if la < lb else (b, a)
+    for i in range(len(long_)):
+        if short == long_[:i] + long_[i + 1:]:
+            return True
+    return False
+
+
+def _overlap(query: set[str], doc: set[str]) -> int:
+    hits = query & doc
+    if len(hits) == len(query):
+        return len(hits)
+    extra = {q for q in query - hits if any(_ed1(q, d) for d in doc)}
+    return len(hits) + len(extra)
+
+
 def tokenize(text: str, lang: str = "de") -> set[str]:
     tokens = {
         t for t in _TOKEN.findall(text.lower()) if len(t) > 2 and t not in STOPWORDS
@@ -69,8 +93,8 @@ def search_scored(
     if topics:
         rows = [c for c in rows if set(topics) & set(c.topics or [])]
     for chunk in rows:
-        title_hits = len(q & tokenize(chunk.title or "", lang))
-        text_hits = len(q & tokenize(chunk.text or "", lang))
+        title_hits = _overlap(q, tokenize(chunk.title or "", lang))
+        text_hits = _overlap(q, tokenize(chunk.text or "", lang))
         score = 3 * title_hits + text_hits
         if score > 0:
             scored.append((score, chunk.source_url, chunk))

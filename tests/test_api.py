@@ -186,3 +186,11 @@ def test_ask_english_plural_stemming():
     ).json()
     assert body["error"] is None
     assert body["claims"][0]["source_url"] == "https://x.de/scope"
+
+
+def test_ask_typo_tolerance():
+    body = client.post(
+        "/ask", json={"question": "how often does my babi sleep?", "lang": "en"}
+    ).json()
+    assert body["error"] is None
+    assert body["claims"][0]["source_url"] == "https://x.de/scope"

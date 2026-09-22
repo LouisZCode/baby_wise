@@ -9,8 +9,8 @@ class Settings(BaseSettings):
         "postgresql+psycopg://postgres:postgres@localhost:5432/bby_wise"
     )
     llm_provider: str = "openrouter"
-    llm_model: str = "qwen/qwen3.8-27b:free"
-    llm_fallback_model: str = "google/gemma-4-26b-a4b-it:free"
+    llm_model: str = "openai/gpt-4.1-nano"
+    llm_fallback_model: str = "qwen/qwen3.8-27b:free"
     openrouter_api_key: str | None = None
 
 
