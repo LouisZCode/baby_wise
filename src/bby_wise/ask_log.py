@@ -23,6 +23,7 @@ def log_ask(
     claims: list[tuple[str, str, int]],
     answer: str | None,
     latency_ms: int,
+    normalized: str | None = None,
 ) -> None:
     entry = {
         "ts": dt.datetime.now(dt.UTC).isoformat(),
@@ -30,6 +31,7 @@ def log_ask(
         "lang": lang,
         "compose": compose,
         "model": model,
+        "normalized": normalized,
         "claims": [
             {"url": url, "lang": clang, "score": score}
             for url, clang, score in claims

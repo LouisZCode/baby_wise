@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import httpx
 
+from .composer import _chat_model
 from .settings import settings
 
 DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
@@ -77,3 +78,36 @@ def route_question(question: str) -> dict | None:
         }
     except Exception:
         return None
+
+
+def normalize_query(question: str, lang: str = "de") -> str:
+    """Rewrite a parent's phrasing into canonical search keywords.
+
+    Handles paraphrase variance ("won't fall asleep" → sleep keywords,
+    "Stuhlgang" ↔ "poop") that token overlap misses. Failure → the
+    original question; callers only use this as a second pass.
+    """
+    from langchain_core.prompts import ChatPromptTemplate
+
+    lang_name = {"de": "German", "en": "English"}.get(lang, lang)
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system",
+             "Rewrite the parent's baby-health question into 8-12 canonical "
+             f"search keywords in {lang_name}, comma-separated, no other text. "
+             "Include synonyms and the clinical term (e.g. poop → stool, "
+             "bowel movement; einschlafen → Schlaf, Nachtruhe)."),
+            ("user", "{question}"),
+        ]
+    )
+    try:
+        out = _chat_model(settings.llm_model).invoke(
+            prompt.format_messages(question=question)
+        ).content
+        text = out if isinstance(out, str) else " ".join(
+            b.get("text", "") for b in out
+            if isinstance(b, dict) and b.get("type") == "text"
+        )
+        return text.strip() or question
+    except Exception:
+        return question

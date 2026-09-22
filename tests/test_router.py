@@ -58,3 +58,28 @@ def test_ask_router_failure_falls_back_unfiltered(monkeypatch):
     ).json()
     assert body["route"] is None
     assert body["claims"]
+
+
+def test_normalize_falls_back_to_original(monkeypatch):
+    import bby_wise.router as router
+
+    class Dead:
+        def invoke(self, *a, **k):
+            raise httpx.ConnectError("down")
+
+    monkeypatch.setattr(router, "_chat_model", lambda model: Dead())
+    assert router.normalize_query("Irgendwas", "de") == "Irgendwas"
+
+
+def test_retrieve_second_pass_wins(monkeypatch):
+    import bby_wise.api as api2
+
+    s = fresh_db()
+    upsert_chunk(s, source="biog", url="https://x.de/r", title="Nachtruhe Baby",
+                 text="Nachtruhe ist wichtig für Babys. " * 6, lang="de",
+                 topics=["schlaf"])
+    monkeypatch.setattr(api2, "normalize_query", lambda q, lang="de": "Nachtruhe Baby")
+    scored, norm = api2._retrieve(s, "zzz schlafengehen", "de", ["schlaf"])
+    assert norm == "Nachtruhe Baby"
+    assert [c.source_url for c, _ in scored] == ["https://x.de/r"]
+    s.close()

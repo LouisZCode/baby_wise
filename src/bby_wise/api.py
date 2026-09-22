@@ -8,7 +8,7 @@ from .composer import compose, compose_turn
 from .db import get_db
 from .models import EVENT_TYPES, MESSAGE_ROLES, Chat, Child, Event, Message
 from .retrieval import MIN_SCORE, search_scored
-from .router import TOPIC_MIN_CONF, route_question
+from .router import TOPIC_MIN_CONF, normalize_query, route_question
 from .schemas import (
     AskIn, AskOut, ChildIn, ChildOut, ConversationOut, EventIn, EventOut,
     MessageOut, TurnIn, TurnOut,
@@ -76,11 +76,7 @@ def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
     t0 = time.perf_counter()
     route = route_question(body.question)
     topics = _route_topics(route)
-    scored = [
-        (c, s)
-        for c, s in search_scored(db, body.question, lang=body.lang, topics=topics)
-        if s >= MIN_SCORE
-    ]
+    scored, normalized = _retrieve(db, body.question, body.lang, topics)
     out = AskOut(claims=[c for c, _ in scored], route=_public_route(route))
     if not scored:
         out.error = {"code": "no_match", "message": _message("no_match", body.lang)}
@@ -99,6 +95,7 @@ def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
         claims=[(c.source_url, c.lang, s) for c, s in scored],
         answer=out.answer,
         latency_ms=int((time.perf_counter() - t0) * 1000),
+        normalized=normalized,
     )
     return out
 
@@ -117,6 +114,32 @@ def _public_route(route: dict | None) -> dict | None:
     if route is None:
         return None
     return {"topic": route["topic"], "urgent": route["urgent"] >= 0.7}
+
+
+# Second pass when the top hit is weak: normalize phrasing, keep the
+# better-scoring pass. Normalization costs ~$0.00001, so it only runs
+# when pass 1 looks thin.
+REWRITE_BELOW = 8
+
+
+def _retrieve(db, question: str, lang: str, topics: list[str] | None):
+    first = [
+        (c, s)
+        for c, s in search_scored(db, question, lang=lang, topics=topics)
+        if s >= MIN_SCORE
+    ]
+    best = max((s for _, s in first), default=0)
+    if best >= REWRITE_BELOW:
+        return first, None
+    normalized = normalize_query(question, lang)
+    second = [
+        (c, s)
+        for c, s in search_scored(db, normalized, lang=lang, topics=topics)
+        if s >= MIN_SCORE
+    ]
+    if second and max(s for _, s in second) > best:
+        return second, normalized
+    return first, None
 
 
 _MESSAGES = {
@@ -175,11 +198,7 @@ def post_turn(chat_id: str, body: TurnIn, db: Session = Depends(get_db)) -> Turn
 
     route = route_question(body.question)
     topics = _route_topics(route)
-    scored = [
-        (c, s)
-        for c, s in search_scored(db, body.question, lang=body.lang, topics=topics)
-        if s >= MIN_SCORE
-    ]
+    scored, normalized = _retrieve(db, body.question, body.lang, topics)
     claims = [c for c, _ in scored]
     history = [
         (m.role, m.content)
@@ -218,6 +237,7 @@ def post_turn(chat_id: str, body: TurnIn, db: Session = Depends(get_db)) -> Turn
         claims=[(c.source_url, c.lang, s) for c, s in scored],
         answer=content,
         latency_ms=int((time.perf_counter() - t0) * 1000),
+        normalized=normalized,
     )
     return TurnOut(user_message=user_msg, assistant_message=asst_msg,
                    error=error, route=_public_route(route))

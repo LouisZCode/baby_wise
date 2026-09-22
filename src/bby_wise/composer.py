@@ -9,7 +9,6 @@ Unreachable LLM → None, the extractive claims still stand on their own.
 
 from __future__ import annotations
 
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from .schemas import ClaimOut
@@ -38,29 +37,48 @@ def _chat_model(model: str):
     if settings.llm_provider == "openrouter":
         from langchain_openai import ChatOpenAI
 
+        # *flash* models think by default and burn the token budget before
+        # answering — disable reasoning for this short-answer workload.
+        kw = {"reasoning": {"enabled": False}} if "flash" in model else {}
         return ChatOpenAI(
             model=model,
             api_key=settings.openrouter_api_key,
             base_url="https://openrouter.ai/api/v1",
             temperature=0.2,
+            **kw,
         )
     from langchain_ollama import ChatOllama
 
     return ChatOllama(model=model, temperature=0.2)
 
 
+def _as_text(content) -> str:
+    """Responses API may return a list of content blocks — join text parts."""
+    if isinstance(content, str):
+        return content
+    parts = [
+        b.get("text", "") for b in content
+        if isinstance(b, dict) and b.get("type") == "text"
+    ]
+    return " ".join(parts)
+
+
 def _run_chain(
     question: str, sources: str, lang: str, model: str, extra: str = ""
 ) -> str:
-    chain = _PROMPT | _chat_model(model) | StrOutputParser()
-    return chain.invoke(
-        {
-            "lang_name": LANG_NAMES.get(lang, lang),
-            "question": question,
-            "sources": sources,
-            "extra": extra,
-        }
-    ).strip()
+    # No output parser: flash models return content blocks, normalized below.
+    msgs = _PROMPT.format_messages(
+        lang_name=LANG_NAMES.get(lang, lang),
+        question=question,
+        sources=sources,
+        extra=extra,
+    )
+    return _as_text(_chat_model(model).invoke(msgs).content).strip()
+
+
+def _models() -> list[str]:
+    return [settings.llm_model, settings.llm_fallback_model,
+            settings.llm_fallback2_model]
 
 
 def _sources_block(claims: list[ClaimOut]) -> str:
@@ -103,7 +121,7 @@ def compose_turn(
 
 
 def _attempt(question: str, sources: str, extra: str, lang: str) -> str | None:
-    for model in (settings.llm_model, settings.llm_fallback_model):
+    for model in _models():
         try:
             return _run_chain(question, sources or "(no matching sources)", lang, model, extra)
         except Exception:
