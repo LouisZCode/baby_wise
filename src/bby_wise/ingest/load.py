@@ -31,11 +31,14 @@ def upsert_chunk(
     published_date: dt.date | None = None,
     guideline_version: str | None = None,
     quarantined: bool = False,
+    translation_of: str | None = None,
 ) -> tuple[str, GuidelineChunk]:
     h = sha256(text)
+    # Identity is (url, lang): translations share the source URL but are
+    # their own versioned records.
     existing = (
         db.query(GuidelineChunk)
-        .filter_by(source_url=url, status="live")
+        .filter_by(source_url=url, lang=lang, status="live")
         .one_or_none()
     )
     if existing is not None and existing.content_hash == h:
@@ -61,6 +64,7 @@ def upsert_chunk(
         content_hash=h,
         crawl_date=_now(),
         status="quarantined" if quarantined else "live",
+        translation_of=translation_of,
     )
     db.add(chunk)
     db.commit()

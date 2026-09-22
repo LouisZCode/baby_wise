@@ -88,6 +88,9 @@ class GuidelineChunk(Base):
         String(256), default=None, index=True
     )
     topics: Mapped[list] = mapped_column(JSON, default=list)
+    # Bilingual store: translations are rows, not columns. A translated row
+    # points at its source chunk; retrieval filters by `lang`.
+    translation_of: Mapped[str | None] = mapped_column(String(36), default=None)
     # FTS: populated by a Postgres trigger (migration); TEXT on sqlite.
     search_tsv: Mapped[str | None] = mapped_column(
         TSVECTOR().with_variant(Text(), "sqlite"), nullable=True

@@ -20,7 +20,11 @@ STOPWORDS = frozenset(
     "welche welcher welches man sich nicht auch nur schon noch sehr als "
     "bei aus nach über durch mein meine meinen meiner meines uns unser "
     "unsere ihren ihrer es er sie wir ihr ich du denn doch mal da dort "
-    "hier wenn dann soll sollte kann können muss müssen darf dürfen".split()
+    "hier wenn dann soll sollte kann können muss müssen darf dürfen "
+    "the a an and or but with from for are was were will would what when "
+    "how why which who whom this that these those its our your their his "
+    "her its not also very can could should must may might shall does did "
+    "has have had been being about into than then there here".split()
 )
 
 _TOKEN = re.compile(r"[a-zäöüß]+")
@@ -32,8 +36,10 @@ def tokenize(text: str) -> set[str]:
     }
 
 
-def search(db: Session, query: str, limit: int = 3) -> list[GuidelineChunk]:
-    """Return up to `limit` live chunks ranked by token overlap.
+def search(
+    db: Session, query: str, limit: int = 3, lang: str = "de"
+) -> list[GuidelineChunk]:
+    """Return up to `limit` live chunks in `lang`, ranked by token overlap.
 
     Title matches weigh 3x — FAQ titles are the question, so they carry
     the intent.
@@ -42,7 +48,8 @@ def search(db: Session, query: str, limit: int = 3) -> list[GuidelineChunk]:
     if not q:
         return []
     scored = []
-    for chunk in db.query(GuidelineChunk).filter_by(status="live").all():
+    rows = db.query(GuidelineChunk).filter_by(status="live", lang=lang).all()
+    for chunk in rows:
         title_hits = len(q & tokenize(chunk.title or ""))
         text_hits = len(q & tokenize(chunk.text or ""))
         score = 3 * title_hits + text_hits

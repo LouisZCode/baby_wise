@@ -39,6 +39,7 @@ class EventOut(BaseModel):
 
 class AskIn(BaseModel):
     question: str = Field(min_length=3, max_length=500)
+    lang: str = Field(default="de", min_length=2, max_length=8)
 
 
 class ClaimOut(BaseModel):
@@ -47,6 +48,8 @@ class ClaimOut(BaseModel):
     source_url: str
     title: str | None
     topics: list[str]
+    lang: str
+    translation_of: str | None = None
 
     model_config = {"from_attributes": True}
 

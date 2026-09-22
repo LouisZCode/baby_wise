@@ -61,6 +61,7 @@ def timeline(child_id: str, db: Session = Depends(get_db)) -> list[Event]:
 
 @app.post("/ask", response_model=AskOut)
 def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
-    # v0 extractive: verbatim top chunks with source labels, no LLM.
-    # conflicts[] stays empty until a second source exists.
-    return AskOut(claims=search(db, body.question))
+    # v0 extractive: verbatim top chunks in the requested language with
+    # source labels, no LLM. conflicts[] stays empty until a second
+    # source exists.
+    return AskOut(claims=search(db, body.question, lang=body.lang))

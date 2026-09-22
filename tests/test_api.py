@@ -124,3 +124,27 @@ def test_ask_no_match_returns_empty_claims():
 def test_ask_rejects_short_question():
     r = client.post("/ask", json={"question": "hi"})
     assert r.status_code == 422
+
+
+def test_ask_lang_scoping():
+    db = TestingSession()
+    _, de = upsert_chunk(
+        db, source="biog", url="https://x.de/scope", title="Wie viel Schlaf?",
+        text="Deutscher Text über Schlaf Babys Nächte. " * 6,
+        lang="de", topics=["schlaf"],
+    )
+    _, en = upsert_chunk(
+        db, source="biog", url="https://x.de/scope", title="How much sleep?",
+        text="English text about babies sleep nights. " * 6,
+        lang="en", topics=["schlaf"], translation_of=de.id,
+    )
+    db.close()
+    de_hits = client.post(
+        "/ask", json={"question": "Wie viel Schlaf Babys?", "lang": "de"}
+    ).json()["claims"]
+    assert {c["lang"] for c in de_hits} == {"de"}
+    en_hits = client.post(
+        "/ask", json={"question": "how much sleep babies nights?", "lang": "en"}
+    ).json()["claims"]
+    assert en_hits[0]["lang"] == "en"
+    assert en_hits[0]["translation_of"] == de.id

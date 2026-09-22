@@ -191,6 +191,23 @@ def test_loader_unchanged_refreshes_topics():
     s.close()
 
 
+def test_loader_translation_is_own_record():
+    s = fresh_db()
+    a1, c1 = upsert_chunk(
+        s, source="biog", url="https://x.de/c", title="T",
+        text="deutscher Text", lang="de", topics=["schlaf"],
+    )
+    a2, c2 = upsert_chunk(
+        s, source="biog", url="https://x.de/c", title="T en",
+        text="english text", lang="en", topics=["schlaf"],
+        translation_of=c1.id,
+    )
+    assert (a1, a2) == ("inserted", "inserted")
+    assert c2.translation_of == c1.id
+    assert s.query(GuidelineChunk).filter_by(source_url="https://x.de/c").count() == 2
+    s.close()
+
+
 def test_loader_quarantine():
     s = fresh_db()
     action, row = upsert_chunk(
