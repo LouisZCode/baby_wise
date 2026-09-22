@@ -75,13 +75,6 @@ export default function Home() {
       </div>
 
       <div className="mt-4 flex flex-1 flex-col gap-3 overflow-y-auto pb-4">
-        {msgs.length === 0 && (
-          <p className="mt-10 text-center text-sm text-stone-400">
-            {lang === "de"
-              ? "Frag etwas — z. B. Wie lange schlafen Babys?"
-              : "Ask anything — e.g. How long do babies sleep?"}
-          </p>
-        )}
         {msgs.map((m) => (
           <div
             key={m.id}
