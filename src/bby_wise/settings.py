@@ -9,7 +9,7 @@ class Settings(BaseSettings):
         "postgresql+psycopg://postgres:postgres@localhost:5432/bby_wise"
     )
     llm_provider: str = "openrouter"
-    llm_model: str = "meta-llama/llama-3.3-70b-instruct:free"
+    llm_model: str = "qwen/qwen3.8-27b:free"
     openrouter_api_key: str | None = None
 
 
