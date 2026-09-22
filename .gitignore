@@ -39,3 +39,14 @@ htmlcov/
 *.swp
 *.swo
 .DS_Store
+
+# Secrets / local config (never commit — API keys live here)
+.env
+*.env.local
+
+# Personal planning notes (local only, never commit)
+AGENTS.md
+architecture.md
+todo_list.md
+LEARNINGS.md
+learnings.md
