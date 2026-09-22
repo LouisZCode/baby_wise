@@ -16,6 +16,7 @@ type AskResponse = {
   claims: Claim[];
   conflicts: unknown[];
   answer: string | null;
+  error: { code: string; message: string } | null;
 };
 
 export default function Home() {
@@ -118,12 +119,18 @@ export default function Home() {
               </p>
             </div>
           )}
-          {result.claims.length === 0 && (
+          {result.error && (
+            <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[15px] text-amber-900">
+              {result.error.message}
+            </p>
+          )}
+          {!compose && result.claims.length === 0 && !result.error && (
             <p className="text-sm text-stone-500">
               No matching guidelines found. Try different words.
             </p>
           )}
-          {result.claims.map((c) => (
+          {!compose &&
+            result.claims.map((c) => (
             <article
               key={`${c.source_url}-${c.lang}`}
               className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"

@@ -7,7 +7,7 @@ from .ask_log import log_ask
 from .composer import compose
 from .db import get_db
 from .models import EVENT_TYPES, Child, Event
-from .retrieval import search_scored
+from .retrieval import MIN_SCORE, search_scored
 from .schemas import AskIn, AskOut, ChildIn, ChildOut, EventIn, EventOut
 from .settings import settings
 
@@ -63,17 +63,27 @@ def timeline(child_id: str, db: Session = Depends(get_db)) -> list[Event]:
 
 @app.post("/ask", response_model=AskOut)
 def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
-    # v0 extractive: verbatim top chunks in the requested language with
-    # source labels, no LLM. conflicts[] stays empty until a second
-    # source exists. compose=True layers the v1 LLM paraphrase on top;
-    # the claims stand alone if the LLM is unreachable.
+    # Explicit states instead of weak-soup answers:
+    # - no_match: nothing scored >= MIN_SCORE → localized message, no claims.
+    # - llm_unavailable: compose requested but the model failed → localized
+    #   message, claims kept in the payload (UI hides them in compose mode).
     import time
 
     t0 = time.perf_counter()
-    scored = search_scored(db, body.question, lang=body.lang)
+    scored = [
+        (c, s) for c, s in search_scored(db, body.question, lang=body.lang)
+        if s >= MIN_SCORE
+    ]
     out = AskOut(claims=[c for c, _ in scored])
-    if body.compose:
+    if not scored:
+        out.error = {"code": "no_match", "message": _message("no_match", body.lang)}
+    elif body.compose:
         out.answer = compose(body.question, out.claims, lang=body.lang)
+        if out.answer is None:
+            out.error = {
+                "code": "llm_unavailable",
+                "message": _message("llm_unavailable", body.lang),
+            }
     log_ask(
         question=body.question,
         lang=body.lang,
@@ -84,3 +94,19 @@ def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
         latency_ms=int((time.perf_counter() - t0) * 1000),
     )
     return out
+
+
+_MESSAGES = {
+    "no_match": {
+        "de": "Dazu habe ich keine passende Leitlinie gefunden. Formuliere die Frage gern um.",
+        "en": "I couldn't find a matching guideline for that. Try rephrasing the question.",
+    },
+    "llm_unavailable": {
+        "de": "Das Modell ist gerade nicht erreichbar. Bitte versuch es in etwa einer Minute erneut.",
+        "en": "The model is currently unreachable. Please try again in a minute or so.",
+    },
+}
+
+
+def _message(code: str, lang: str) -> str:
+    return _MESSAGES[code].get(lang, _MESSAGES[code]["en"])

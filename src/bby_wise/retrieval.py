@@ -29,6 +29,10 @@ STOPWORDS = frozenset(
 
 _TOKEN = re.compile(r"[a-zäöüß]+")
 
+# Minimum score for a claim to count as a match. Calibrated: exact FAQ
+# hits score 7+, token-soup ("baby" matching everything) scores 1-4.
+MIN_SCORE = 5
+
 
 def tokenize(text: str) -> set[str]:
     return {

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     )
     llm_provider: str = "openrouter"
     llm_model: str = "qwen/qwen3.8-27b:free"
+    llm_fallback_model: str = "google/gemma-4-26b-a4b-it:free"
     openrouter_api_key: str | None = None
 
 

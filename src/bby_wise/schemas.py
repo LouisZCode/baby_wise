@@ -59,3 +59,4 @@ class AskOut(BaseModel):
     claims: list[ClaimOut]
     conflicts: list[dict] = Field(default_factory=list)
     answer: str | None = None
+    error: dict | None = None

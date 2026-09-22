@@ -34,19 +34,30 @@ _PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
-def _chat_model():
+def _chat_model(model: str):
     if settings.llm_provider == "openrouter":
         from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
-            model=settings.llm_model,
+            model=model,
             api_key=settings.openrouter_api_key,
             base_url="https://openrouter.ai/api/v1",
             temperature=0.2,
         )
     from langchain_ollama import ChatOllama
 
-    return ChatOllama(model=settings.llm_model, temperature=0.2)
+    return ChatOllama(model=model, temperature=0.2)
+
+
+def _run_chain(question: str, sources: str, lang: str, model: str) -> str:
+    chain = _PROMPT | _chat_model(model) | StrOutputParser()
+    return chain.invoke(
+        {
+            "lang_name": LANG_NAMES.get(lang, lang),
+            "question": question,
+            "sources": sources,
+        }
+    ).strip()
 
 
 def compose(question: str, claims: list[ClaimOut], lang: str = "de") -> str | None:
@@ -57,14 +68,9 @@ def compose(question: str, claims: list[ClaimOut], lang: str = "de") -> str | No
         f"SOURCE {i + 1} ({c.source}, {c.title}):\n{c.text}"
         for i, c in enumerate(claims)
     )
-    try:
-        chain = _PROMPT | _chat_model() | StrOutputParser()
-        return chain.invoke(
-            {
-                "lang_name": LANG_NAMES.get(lang, lang),
-                "question": question,
-                "sources": sources,
-            }
-        ).strip()
-    except Exception:
-        return None
+    for model in (settings.llm_model, settings.llm_fallback_model):
+        try:
+            return _run_chain(question, sources, lang, model)
+        except Exception:
+            continue
+    return None
