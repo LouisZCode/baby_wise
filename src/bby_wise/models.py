@@ -63,6 +63,32 @@ class Chat(Base):
         DateTime(timezone=True), default=_now
     )
 
+    messages: Mapped[list[Message]] = relationship(
+        back_populates="chat", cascade="all, delete-orphan"
+    )
+
+
+MESSAGE_ROLES = ("user", "assistant")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    chat_id: Mapped[str] = mapped_column(
+        ForeignKey("chats.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    content: Mapped[str] = mapped_column(Text)
+    lang: Mapped[str] = mapped_column(String(8), default="de")
+    # Assistant messages: source URLs behind the answer (empty = don't-know).
+    sources: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=_now
+    )
+
+    chat: Mapped[Chat] = relationship(back_populates="messages")
+
 
 class GuidelineChunk(Base):
     __tablename__ = "guideline_chunks"

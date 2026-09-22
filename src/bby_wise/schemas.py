@@ -60,3 +60,30 @@ class AskOut(BaseModel):
     conflicts: list[dict] = Field(default_factory=list)
     answer: str | None = None
     error: dict | None = None
+
+
+class ConversationOut(BaseModel):
+    id: str
+
+    model_config = {"from_attributes": True}
+
+
+class TurnIn(BaseModel):
+    question: str = Field(min_length=3, max_length=500)
+    lang: str = Field(default="de", min_length=2, max_length=8)
+
+
+class MessageOut(BaseModel):
+    id: str
+    role: str
+    content: str
+    lang: str
+    sources: list[str]
+
+    model_config = {"from_attributes": True}
+
+
+class TurnOut(BaseModel):
+    user_message: MessageOut
+    assistant_message: MessageOut
+    error: dict | None = None

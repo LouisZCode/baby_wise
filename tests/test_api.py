@@ -133,6 +133,28 @@ def test_ask_compose_off_by_default():
     assert body["claims"]
 
 
+def test_conversation_turn_no_match_without_history():
+    cid = client.post("/conversations").json()["id"]
+    turn = client.post(
+        f"/conversations/{cid}/messages",
+        json={"question": "Xylophon Reparaturanleitung", "lang": "de"},
+    )
+    assert turn.status_code == 200
+    body = turn.json()
+    assert body["error"]["code"] == "no_match"
+    assert body["assistant_message"]["sources"] == []
+    hist = client.get(f"/conversations/{cid}").json()
+    assert [m["role"] for m in hist] == ["user", "assistant"]
+
+
+def test_conversation_unknown_404():
+    assert client.get("/conversations/nope").status_code == 404
+    assert client.post(
+        "/conversations/nope/messages",
+        json={"question": "Wie viel Schlaf?"},
+    ).status_code == 404
+
+
 def test_ask_lang_scoping():
     db = TestingSession()
     _, de = upsert_chunk(

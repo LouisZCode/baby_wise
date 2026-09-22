@@ -29,7 +29,7 @@ LANG_NAMES = {"de": "German", "en": "English"}
 _PROMPT = ChatPromptTemplate.from_messages(
     [
         ("system", SYSTEM),
-        ("user", "QUESTION: {question}\n\nSOURCES:\n{sources}"),
+        ("user", "QUESTION: {question}\n\nSOURCES:\n{sources}\n\n{extra}"),
     ]
 )
 
@@ -49,28 +49,63 @@ def _chat_model(model: str):
     return ChatOllama(model=model, temperature=0.2)
 
 
-def _run_chain(question: str, sources: str, lang: str, model: str) -> str:
+def _run_chain(
+    question: str, sources: str, lang: str, model: str, extra: str = ""
+) -> str:
     chain = _PROMPT | _chat_model(model) | StrOutputParser()
     return chain.invoke(
         {
             "lang_name": LANG_NAMES.get(lang, lang),
             "question": question,
             "sources": sources,
+            "extra": extra,
         }
     ).strip()
 
 
-def compose(question: str, claims: list[ClaimOut], lang: str = "de") -> str | None:
-    """Return a grounded answer string, or None if the LLM is unreachable."""
-    if not claims:
-        return None
-    sources = "\n\n".join(
+def _sources_block(claims: list[ClaimOut]) -> str:
+    return "\n\n".join(
         f"SOURCE {i + 1} ({c.source}, {c.title}):\n{c.text}"
         for i, c in enumerate(claims)
     )
+
+
+def compose(question: str, claims: list[ClaimOut], lang: str = "de") -> str | None:
+    """Single question, no history. Returns None if the LLM is unreachable."""
+    if not claims:
+        return None
+    return _attempt(question, _sources_block(claims), "", lang)
+
+
+def compose_turn(
+    question: str,
+    claims: list[ClaimOut],
+    history: list[tuple[str, str]],
+    lang: str = "de",
+) -> str | None:
+    """Follow-up aware: history is prior (role, content) pairs, oldest first.
+
+    Sources-only rule unchanged: every fact from SOURCES or earlier
+    assistant turns that cited sources; anything else gets "I don't know".
+    """
+    hist = (
+        "HISTORY:\n"
+        + "\n".join(f"{r.upper()}: {c}" for r, c in history[-6:])
+        if history
+        else "HISTORY: (none)"
+    )
+    extra = (
+        "The user may refer to earlier turns (e.g. 'and at night?'). "
+        "Use the HISTORY to resolve references, but base every fact on "
+        "SOURCES or on earlier assistant turns that cited sources."
+    )
+    return _attempt(f"{question}\n\n{hist}", _sources_block(claims), extra, lang)
+
+
+def _attempt(question: str, sources: str, extra: str, lang: str) -> str | None:
     for model in (settings.llm_model, settings.llm_fallback_model):
         try:
-            return _run_chain(question, sources, lang, model)
+            return _run_chain(question, sources or "(no matching sources)", lang, model, extra)
         except Exception:
             continue
     return None
