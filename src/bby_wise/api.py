@@ -69,8 +69,5 @@ def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
     claims = search(db, body.question, lang=body.lang)
     out = AskOut(claims=claims)
     if body.compose:
-        out.answer = compose(
-            body.question, out.claims, lang=body.lang,
-            model=settings.llm_model,
-        )
+        out.answer = compose(body.question, out.claims, lang=body.lang)
     return out
