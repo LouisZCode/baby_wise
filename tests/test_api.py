@@ -126,6 +126,13 @@ def test_ask_rejects_short_question():
     assert r.status_code == 422
 
 
+def test_ask_compose_off_by_default():
+    _seed_chunks()
+    body = client.post("/ask", json={"question": "Wie viel Schlaf Babys?"}).json()
+    assert body["answer"] is None
+    assert body["claims"]
+
+
 def test_ask_lang_scoping():
     db = TestingSession()
     _, de = upsert_chunk(

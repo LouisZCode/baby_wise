@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
+from .composer import compose
 from .db import get_db
 from .models import EVENT_TYPES, Child, Event
 from .retrieval import search
@@ -63,5 +64,13 @@ def timeline(child_id: str, db: Session = Depends(get_db)) -> list[Event]:
 def ask(body: AskIn, db: Session = Depends(get_db)) -> AskOut:
     # v0 extractive: verbatim top chunks in the requested language with
     # source labels, no LLM. conflicts[] stays empty until a second
-    # source exists.
-    return AskOut(claims=search(db, body.question, lang=body.lang))
+    # source exists. compose=True layers the v1 LLM paraphrase on top;
+    # the claims stand alone if the LLM is unreachable.
+    claims = search(db, body.question, lang=body.lang)
+    out = AskOut(claims=claims)
+    if body.compose:
+        out.answer = compose(
+            body.question, out.claims, lang=body.lang,
+            model=settings.llm_model,
+        )
+    return out

@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql+psycopg://postgres:postgres@localhost:5432/bby_wise"
     )
+    llm_model: str = "qwen3:1.7b"
 
 
 settings = Settings()

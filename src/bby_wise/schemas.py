@@ -40,6 +40,7 @@ class EventOut(BaseModel):
 class AskIn(BaseModel):
     question: str = Field(min_length=3, max_length=500)
     lang: str = Field(default="de", min_length=2, max_length=8)
+    compose: bool = False
 
 
 class ClaimOut(BaseModel):
@@ -57,3 +58,4 @@ class ClaimOut(BaseModel):
 class AskOut(BaseModel):
     claims: list[ClaimOut]
     conflicts: list[dict] = Field(default_factory=list)
+    answer: str | None = None
