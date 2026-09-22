@@ -34,24 +34,36 @@ _TOKEN = re.compile(r"[a-zäöüß]+")
 MIN_SCORE = 5
 
 
-def tokenize(text: str) -> set[str]:
-    return {
+def _stem_en(token: str) -> str:
+    """Light English plural stemming (babies→baby, infants→infant)."""
+    if len(token) > 4 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) > 3 and token.endswith("s") and not token.endswith("ss"):
+        return token[:-1]
+    return token
+
+
+def tokenize(text: str, lang: str = "de") -> set[str]:
+    tokens = {
         t for t in _TOKEN.findall(text.lower()) if len(t) > 2 and t not in STOPWORDS
     }
+    if lang == "en":
+        tokens = {_stem_en(t) for t in tokens}
+    return tokens
 
 
 def search_scored(
     db: Session, query: str, limit: int = 3, lang: str = "de"
 ) -> list[tuple[GuidelineChunk, int]]:
     """Same as search, but with scores attached (for logging/eval)."""
-    q = tokenize(query)
+    q = tokenize(query, lang)
     if not q:
         return []
     scored = []
     rows = db.query(GuidelineChunk).filter_by(status="live", lang=lang).all()
     for chunk in rows:
-        title_hits = len(q & tokenize(chunk.title or ""))
-        text_hits = len(q & tokenize(chunk.text or ""))
+        title_hits = len(q & tokenize(chunk.title or "", lang))
+        text_hits = len(q & tokenize(chunk.text or "", lang))
         score = 3 * title_hits + text_hits
         if score > 0:
             scored.append((score, chunk.source_url, chunk))

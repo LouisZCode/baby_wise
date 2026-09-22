@@ -177,3 +177,12 @@ def test_ask_lang_scoping():
     ).json()["claims"]
     assert en_hits[0]["lang"] == "en"
     assert en_hits[0]["translation_of"] == de.id
+
+
+def test_ask_english_plural_stemming():
+    # Needs the scope rows from test_ask_lang_scoping (definition order).
+    body = client.post(
+        "/ask", json={"question": "how often does my baby sleep?", "lang": "en"}
+    ).json()
+    assert body["error"] is None
+    assert body["claims"][0]["source_url"] == "https://x.de/scope"
